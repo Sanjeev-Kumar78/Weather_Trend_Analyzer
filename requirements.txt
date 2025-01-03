@@ -1,0 +1,11 @@
+streamlit
+pandas
+matplotlib
+seaborn
+plotly
+windrose
+scikit-learn
+statsmodels
+googlemaps
+requests
+xarray

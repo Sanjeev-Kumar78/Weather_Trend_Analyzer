@@ -13,6 +13,25 @@ This project analyzes the weather data of a city, as per the user's choice, and 
 - GoogleMaps API (for geocoding)
 - [Open-Meteo](https://open-meteo.com/)
 
+## Usage
+1. Clone the repository.
+2. Install the required packages using the following command:
+```bash
+pip install -r requirements.txt
+```
+3. Create an `.env` file in the root directory and add the following variables:
+   ```bash
+   GOOGLE_MAPS_API_KEY=<Your Google Maps API Key> # Get the API Key from Google Cloud Platform
+4. Run the `WeatherTrendAnalyzer.ipynb` file in Jupyter Notebook.
+5. Select the Form of Analysis on data whether it is on Hourly or Daily type.
+   1. Hourly: The data will be fetched on an hourly basis of each day from the start date till the end date.
+      1. Hourly data is beneficial when you want to analyze the weather trend of a city on an hourly basis for a less number of days.
+   2. Daily: The data will be fetched on a daily basis from the start date till the end date.
+      1. Daily data is beneficial when you want to analyze the weather trend of a city on a daily basis for a large number of days or over a years of trend.
+6. Enter the city name for which you want to analyze the weather trend.
+7. Enter the Start and End dates for which you want to analyze the weather trend.
+8. The weather trend will be displayed in the form of graphs.
+
 ## Future Improvements
 - The project can be extended to show the weather trend of multiple cities.
 - The project can be integrated with a chatbot to get the weather trend of a city by just asking the chatbot. Using the RAG model, the chatbot can be trained to answer questions related to weather.
