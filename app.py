@@ -1,8 +1,16 @@
 # app.py
 import streamlit as st
 # -------------------------------------------------------------------
+import numpy as np
 import weather_utils as wu
-import visual_graphs as vg
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from statsmodels.tsa.seasonal import seasonal_decompose
+
 
 
 def main():
@@ -116,83 +124,178 @@ def main():
                     markdown_text += f'| {key} | {value} |\n'
                 st.markdown(markdown_text)
 
-            # Visualization selection
-                plot_type = st.sidebar.selectbox(
-                    'Select Plot Type',
-                    ['Temperature', 'Humidity', 'Pressure', 'Precipitation',
-                     'Wind Speed', 'Cloud Cover', 'Evapotranspiration and Vapour', 'Soil Temperature', 'Soil Moisture','Correlation Matrix', 'Sunrise and Sunset Times', 'Sunshine and Daylight Duration']
-                )
+            if frequency == 'hourly':
+                # Plot temperature
+                fig = px.line(weather_data, x=weather_data['hour'], y=['temperature_2m', 'apparent_temperature', 'dewpoint_2m'],
+                              title='Hourly Temperature Trends',
+                              labels={'value': 'Temperature (°C)', 'hour': 'Time GMT+0', 'variable': 'Temperature Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                # Display the selected plot
-                st.header(f'{plot_type} Visualization')
+                # Plot humidity
+                fig = px.line(weather_data, x=weather_data['hour'], y=['relative_humidity_2m'],
+                              title='Hourly Humidity Trends', labels={'value': 'Humidity (%)', 'hour': 'Time GMT+0'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                with st.container():
-                    if plot_type == 'Temperature':
-                        fig = vg.plot_temperature(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot pressure
+                fig = px.line(weather_data, x=weather_data['hour'], y=['pressure_msl', 'surface_pressure'],
+                              title='Hourly Pressure Trends',
+                              labels={'value': 'Pressure (hPa)', 'hour': 'Time GMT+0', 'variable': 'Pressure Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Humidity':
-                        fig = vg.plot_humidity(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot precipitation
+                fig = px.bar(weather_data, x=weather_data['hour'], y='precipitation',
+                             title='Hourly Precipitation', labels={'precipitation': 'Precipitation (mm)', 'hour': 'Time GMT+0'})
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Pressure':
-                        fig = vg.plot_pressure(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot wind speed
+                fig = px.line(weather_data, x=weather_data['hour'], y=['wind_speed_10m', 'wind_gusts_10m'],
+                              title='Hourly Wind Speed and Gusts', labels={'value': 'Speed (km/h)', 'hour': 'Time GMT+0'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Precipitation':
-                        fig = vg.plot_precipitation(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot cloud cover
+                fig = px.line(weather_data, x=weather_data['hour'], y=['cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high'],
+                              title='Hourly Cloud Cover Trends',
+                              labels={'value': 'Cloud Cover (%)', 'hour': 'Time GMT+0', 'variable': 'Cloud Cover Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Wind Speed':
-                        fig = vg.plot_wind_speed(weather_data, frequency)
-                        st.pyplot(fig)
+            elif frequency == 'daily':
+                # Plot temperature trends
+                fig = px.line(weather_data, x=weather_data['date'], y=['temperature_2m_max', 'temperature_2m_min', 'temperature_2m_mean'],
+                              title='Daily Temperature Trends',
+                              labels={'value': 'Temperature (°C)', 'date': 'Date', 'variable': 'Temperature Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Cloud Cover':
-                        fig = vg.plot_cloud_cover(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot precipitation patterns
+                fig = px.bar(weather_data, x=weather_data['date'], y=['precipitation_sum', 'rain_sum', 'snowfall_sum'],
+                             title='Daily Precipitation Summary',
+                             labels={'value': 'Precipitation (mm)', 'date': 'Date', 'variable': 'Precipitation Type'})
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Evapotranspiration and Vapour':
-                        fig = vg.plot_evapotranspiration_vapour(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot wind speed and direction
+                fig = px.line(weather_data, x=weather_data['date'], y=['wind_speed_10m_max', 'wind_gusts_10m_max'],
+                              title='Daily Maximum Wind Speed and Gusts',
+                              labels={'value': 'Speed (km/h)', 'date': 'Date', 'variable': 'Wind Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Soil Temperature':
-                        fig = vg.plot_soil_temperature(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot shortwave radiation and evapotranspiration
+                fig = px.line(weather_data, x=weather_data['date'], y=['shortwave_radiation_sum', 'et0_fao_evapotranspiration'],
+                              title='Daily Shortwave Radiation and Evapotranspiration',
+                              labels={'value': 'Radiation (W/m²) / Evapotranspiration (mm)', 'date': 'Date', 'variable': 'Variable'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Soil Moisture':
-                        fig = vg.plot_soil_moisture(weather_data, frequency)
-                        st.pyplot(fig)
+                # Convert sunrise and sunset times to hours
+                weather_data['sunrise_hour'] = pd.to_datetime(weather_data['sunrise']).dt.hour + pd.to_datetime(weather_data['sunrise']).dt.minute / 60
+                weather_data['sunset_hour'] = pd.to_datetime(weather_data['sunset']).dt.hour + pd.to_datetime(weather_data['sunset']).dt.minute / 60
 
-                    elif plot_type == 'Correlation Matrix':
-                        fig = vg.plot_correlation_matrix(weather_data, frequency)
-                        st.pyplot(fig)
+                # Plot sunrise and sunset times
+                fig = px.line(weather_data, x=weather_data['date'], y=['sunrise_hour', 'sunset_hour'],
+                            title='Daily Sunrise and Sunset Times',
+                            labels={'value': 'Time (GMT+0)', 'date': 'Date', 'variable': 'Time Type'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Sunrise and Sunset Times':
-                        if frequency == 'hourly':
-                            st.warning("Sunrise and Sunset Times plot is only available for daily frequency.")
-                        else:
-                            fig = vg.plot_soil_temperature(weather_data, frequency)
-                            st.pyplot(fig)
-                            fig = vg.plot_evapotranspiration_vapour(weather_data, frequency)
-                            st.pyplot(fig)
+                # Plot daylight duration
+                fig = px.line(weather_data, x=weather_data['date'], y=['daylight_duration'],
+                            title='Daily Daylight Duration',
+                            labels={'value': 'Duration (seconds)', 'date': 'Date'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                    elif plot_type == 'Sunshine and Daylight Duration':
-                        if frequency == 'hourly':
-                            st.warning("Sunshine and Daylight Duration plot is only available for daily frequency.")
-                        else:
-                            fig = vg.plot_sunshine_duration(weather_data, frequency)
-                            st.pyplot(fig)
-                            fig = vg.plot_soil_moisture(weather_data, frequency)
-                            st.pyplot(fig)
+                # Plot sunshine duration
+                fig = px.line(weather_data, x=weather_data['date'], y=['sunshine_duration'],
+                            title='Daily Sunshine Duration',
+                            labels={'value': 'Duration (seconds)', 'date': 'Date'})
+                fig.update_layout(legend_title_text='')
+                st.plotly_chart(fig)
 
-                # Advanced Analysis (currently commented out)
-                # if st.sidebar.checkbox('Show Cluster Analysis'):
-                #     st.header('Cluster Analysis')
-                #     st.plotly_chart(plot_cluster_analysis(df))
 
-                # if st.sidebar.checkbox('Show Seasonal Decomposition'):
-                #     st.header('Seasonal Decomposition')
-                #     st.pyplot(plot_seasonal_decomposition(df, frequency))
+                # Plot weather code distribution
+                fig = px.bar(weather_data, x=weather_data['date'], y=['weather_code'],
+                            title='Daily Weather Code Distribution',
+                            labels={'weather_code': 'Weather Code', 'date': 'Date'})
+                st.plotly_chart(fig)
+
+            # Plot correlation matrix
+            numeric_columns = weather_data.select_dtypes(include=[np.number]).columns
+            corr_matrix = weather_data[numeric_columns].corr()
+            fig, ax = plt.subplots(figsize=(30,20))
+            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm')
+            ax.set_title('Correlation Matrix')
+            ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels
+            st.pyplot(fig)
+
+
+                # Daily Index:Index(['weather_code', 'temperature_2m_max', 'temperature_2m_min',
+    #    'temperature_2m_mean', 'apparent_temperature_max',
+    #    'apparent_temperature_min', 'apparent_temperature_mean', 'sunrise',
+    #    'sunset', 'daylight_duration', 'sunshine_duration', 'precipitation_sum',
+    #    'rain_sum', 'snowfall_sum', 'precipitation_hours', 'wind_speed_10m_max',
+    #    'wind_gusts_10m_max', 'wind_direction_10m_dominant',
+    #    'shortwave_radiation_sum', 'et0_fao_evapotranspiration', 'date',
+    #    'sunrise_hour', 'sunset_hour'],
+    #   dtype='object')
+    # Hourly Index:Index(['temperature_2m', 'relative_humidity_2m', 'dewpoint_2m',
+    #    'apparent_temperature', 'precipitation', 'rain', 'snowfall',
+    #    'snow_depth', 'weather_code', 'pressure_msl', 'surface_pressure',
+    #    'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high',
+    #    'et0_fao_evapotranspiration', 'vapour_pressure_deficit',
+    #    'wind_speed_10m', 'wind_speed_100m', 'wind_direction_10m',
+    #    'wind_direction_100m', 'wind_gusts_10m', 'soil_temperature_0_to_7cm',
+    #    'soil_temperature_7_to_28cm', 'soil_temperature_28_to_100cm',
+    #    'soil_temperature_100_to_255cm', 'soil_moisture_0_to_7cm',
+    #    'soil_moisture_7_to_28cm', 'soil_moisture_28_to_100cm',
+    #    'soil_moisture_100_to_255cm', 'hour'],
+    #   dtype='object')
+
+            # Plot regression analysis
+            print(weather_data.columns)
+            X = weather_data[['temperature_2m_max', 'relative_humidity_2m', 'precipitation_sum', 'wind_speed_10m_max']]
+            y = weather_data['et0_fao_evapotranspiration']
+            from sklearn.linear_model import LinearRegression
+            from sklearn.model_selection import train_test_split
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            model = LinearRegression()
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            plt.figure(figsize=(10,6))
+            plt.scatter(y_test, y_pred)
+            plt.xlabel('Actual')
+            plt.ylabel('Predicted')
+            plt.title('Regression Analysis')
+            st.pyplot(plt)
+
+            # Advanced Analysis
+            if st.sidebar.checkbox('Show Cluster Analysis'):
+                features = ['temperature_2m', 'relative_humidity_2m', 'dewpoint_2m',
+                            'apparent_temperature', 'precipitation', 'wind_speed_10m']
+                X = weather_data[features]
+                X_scaled = StandardScaler().fit_transform(X)
+                kmeans = KMeans(n_clusters=4, random_state=42) # Adjust n_clusters as needed
+                weather_data['cluster'] = kmeans.fit_predict(X_scaled)
+                fig = px.scatter(weather_data, x='temperature_2m', y='relative_humidity_2m', color='cluster',
+                                title='Weather Cluster Analysis')
+                st.plotly_chart(fig)
+
+            if st.sidebar.checkbox('Show Seasonal Decomposition'):
+                if frequency == 'daily':
+                    result = seasonal_decompose(weather_data['temperature_2m'], model='additive', period=365) # Adjust period if needed
+                elif frequency == 'hourly':
+                    result = seasonal_decompose(weather_data['temperature_2m'], model='additive', period=24)
+                fig, axes = plt.subplots(4, 1, figsize=(12, 12))
+                result.observed.plot(ax=axes[0], title='Observed')
+                result.trend.plot(ax=axes[1], title='Trend')
+                result.seasonal.plot(ax=axes[2], title='Seasonal')
+                result.resid.plot(ax=axes[3], title='Residual')
+                plt.tight_layout()
+                st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
