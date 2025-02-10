@@ -9,3 +9,7 @@ statsmodels
 googlemaps
 requests
 xarray
+langchain
+chromadb
+sentence-transformers
+huggingface-hub

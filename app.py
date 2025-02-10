@@ -232,70 +232,149 @@ def main():
             ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels
             st.pyplot(fig)
 
+            # Regression Analysis Section
+            st.markdown("### Regression Analysis")
+            st.write("This analysis predicts evapotranspiration based on key weather parameters.")
+            
+            if frequency == 'daily':
+                X = weather_data[['temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max']]
+                y = weather_data['et0_fao_evapotranspiration']
+                st.write("Using daily maximum temperature, minimum temperature, precipitation sum, and maximum wind speed as predictors.")
+            else:  # hourly
+                X = weather_data[['temperature_2m', 'relative_humidity_2m', 'precipitation', 'wind_speed_10m']]
+                y = weather_data['et0_fao_evapotranspiration']
+                st.write("Using temperature, humidity, precipitation, and wind speed as predictors.")
 
-                # Daily Index:Index(['weather_code', 'temperature_2m_max', 'temperature_2m_min',
-    #    'temperature_2m_mean', 'apparent_temperature_max',
-    #    'apparent_temperature_min', 'apparent_temperature_mean', 'sunrise',
-    #    'sunset', 'daylight_duration', 'sunshine_duration', 'precipitation_sum',
-    #    'rain_sum', 'snowfall_sum', 'precipitation_hours', 'wind_speed_10m_max',
-    #    'wind_gusts_10m_max', 'wind_direction_10m_dominant',
-    #    'shortwave_radiation_sum', 'et0_fao_evapotranspiration', 'date',
-    #    'sunrise_hour', 'sunset_hour'],
-    #   dtype='object')
-    # Hourly Index:Index(['temperature_2m', 'relative_humidity_2m', 'dewpoint_2m',
-    #    'apparent_temperature', 'precipitation', 'rain', 'snowfall',
-    #    'snow_depth', 'weather_code', 'pressure_msl', 'surface_pressure',
-    #    'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high',
-    #    'et0_fao_evapotranspiration', 'vapour_pressure_deficit',
-    #    'wind_speed_10m', 'wind_speed_100m', 'wind_direction_10m',
-    #    'wind_direction_100m', 'wind_gusts_10m', 'soil_temperature_0_to_7cm',
-    #    'soil_temperature_7_to_28cm', 'soil_temperature_28_to_100cm',
-    #    'soil_temperature_100_to_255cm', 'soil_moisture_0_to_7cm',
-    #    'soil_moisture_7_to_28cm', 'soil_moisture_28_to_100cm',
-    #    'soil_moisture_100_to_255cm', 'hour'],
-    #   dtype='object')
+             
 
-            # Plot regression analysis
-            print(weather_data.columns)
-            X = weather_data[['temperature_2m_max', 'relative_humidity_2m', 'precipitation_sum', 'wind_speed_10m_max']]
-            y = weather_data['et0_fao_evapotranspiration']
-            from sklearn.linear_model import LinearRegression
-            from sklearn.model_selection import train_test_split
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            model = LinearRegression()
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            plt.figure(figsize=(10,6))
-            plt.scatter(y_test, y_pred)
-            plt.xlabel('Actual')
-            plt.ylabel('Predicted')
-            plt.title('Regression Analysis')
-            st.pyplot(plt)
+            # Weather Pattern Clustering
+            st.markdown("### Weather Pattern Clustering")
+            st.write("This analysis groups similar weather patterns into clusters.")
 
-            # Advanced Analysis
-            if st.sidebar.checkbox('Show Cluster Analysis'):
+            if frequency == 'daily':
+                features = ['temperature_2m_max', 'temperature_2m_min', 'temperature_2m_mean',
+                           'apparent_temperature_max', 'precipitation_sum', 'wind_speed_10m_max']
+            else:  # hourly
                 features = ['temperature_2m', 'relative_humidity_2m', 'dewpoint_2m',
-                            'apparent_temperature', 'precipitation', 'wind_speed_10m']
-                X = weather_data[features]
-                X_scaled = StandardScaler().fit_transform(X)
-                kmeans = KMeans(n_clusters=4, random_state=42) # Adjust n_clusters as needed
-                weather_data['cluster'] = kmeans.fit_predict(X_scaled)
+                           'apparent_temperature', 'precipitation', 'wind_speed_10m']
+            
+            # Perform clustering
+            X = weather_data[features]
+            X_scaled = StandardScaler().fit_transform(X)
+            kmeans = KMeans(n_clusters=4, random_state=42)
+            weather_data['cluster'] = kmeans.fit_predict(X_scaled)
+            
+            # Plot clusters
+            if frequency == 'daily':
+                fig = px.scatter(weather_data, x='temperature_2m_max', y='precipitation_sum', color='cluster',
+                                title='Weather Clusters: Temperature vs Precipitation',
+                                labels={'temperature_2m_max': 'Maximum Temperature (°C)',
+                                       'precipitation_sum': 'Total Precipitation (mm)'})
+            else:  # hourly
                 fig = px.scatter(weather_data, x='temperature_2m', y='relative_humidity_2m', color='cluster',
-                                title='Weather Cluster Analysis')
-                st.plotly_chart(fig)
+                                title='Weather Clusters: Temperature vs Humidity',
+                                labels={'temperature_2m': 'Temperature (°C)',
+                                       'relative_humidity_2m': 'Relative Humidity (%)'})
+            st.plotly_chart(fig)
 
-            if st.sidebar.checkbox('Show Seasonal Decomposition'):
-                if frequency == 'daily':
-                    result = seasonal_decompose(weather_data['temperature_2m'], model='additive', period=365) # Adjust period if needed
-                elif frequency == 'hourly':
-                    result = seasonal_decompose(weather_data['temperature_2m'], model='additive', period=24)
-                fig, axes = plt.subplots(4, 1, figsize=(12, 12))
-                result.observed.plot(ax=axes[0], title='Observed')
-                result.trend.plot(ax=axes[1], title='Trend')
-                result.seasonal.plot(ax=axes[2], title='Seasonal')
-                result.resid.plot(ax=axes[3], title='Residual')
-                plt.tight_layout()
-                st.pyplot(fig)
+            # Seasonal Decomposition
+            st.markdown("### Seasonal Pattern Analysis")
+            st.write("Breaking down the temperature pattern into trend, seasonal, and random components.")
+
+            if frequency == 'daily':
+                temp_col = 'temperature_2m_mean'
+                period = 365  # yearly seasonality
+                title_suffix = "Daily Mean Temperature"
+            else:  # hourly
+                temp_col = 'temperature_2m'
+                period = 24  # daily seasonality
+                title_suffix = "Hourly Temperature"
+            
+            result = seasonal_decompose(weather_data[temp_col], model='additive', period=period)
+            fig, axes = plt.subplots(4, 1, figsize=(12, 12))
+            result.observed.plot(ax=axes[0], title=f'Observed {title_suffix}')
+            result.trend.plot(ax=axes[1], title='Long-term Trend')
+            result.seasonal.plot(ax=axes[2], title='Seasonal Pattern')
+            result.resid.plot(ax=axes[3], title='Random Fluctuations')
+            plt.tight_layout()
+            st.pyplot(fig)
+
+            # RAG
+            from langchain.vectorstores import Chroma
+            from langchain.embeddings import HuggingFaceEmbeddings
+            from langchain.text_splitter import RecursiveCharacterTextSplitter
+            from langchain.chains import RetrievalQA
+            from langchain.llms import HuggingFaceHub
+            import chromadb
+
+            # RAG Implementation
+            def setup_rag(weather_data, frequency):
+                # Convert weather data to documents
+                documents = []
+                for _, row in weather_data.iterrows():
+                    if frequency == 'daily':
+                        content = f"Date: {row.name}, Temperature Max: {row['temperature_2m_max']}°C, " \
+                                f"Temperature Min: {row['temperature_2m_min']}°C, " \
+                                f"Precipitation: {row['precipitation_sum']}mm"
+                    else:
+                        content = f"Time: {row.name}, Temperature: {row['temperature_2m']}°C, " \
+                                f"Humidity: {row['relative_humidity_2m']}%, " \
+                                f"Precipitation: {row['precipitation']}mm"
+                    documents.append(content)
+
+                # Initialize text splitter and create chunks
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000,
+                    chunk_overlap=200
+                )
+                texts = text_splitter.create_documents(documents)
+
+                # Setup vector store
+                embeddings = HuggingFaceEmbeddings()
+                vectorstore = Chroma.from_documents(
+                    documents=texts,
+                    embedding=embeddings,
+                    collection_name="weather_data"
+                )
+
+                # Initialize retriever
+                retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+                
+                # Setup QA chain
+                llm = HuggingFaceHub(repo_id="google/flan-t5-base", model_kwargs={"temperature": 0.5})
+                qa_chain = RetrievalQA.from_chain_type(
+                    llm=llm,
+                    chain_type="stuff",
+                    retriever=retriever
+                )
+
+                return qa_chain
+
+            # Add to main function
+            st.subheader("Ask Questions About Weather Data")
+            if 'qa_chain' not in st.session_state:
+                st.session_state.qa_chain = setup_rag(weather_data, frequency)
+
+            user_question = st.text_input("Ask a question about the weather data:")
+            if user_question:
+                answer = st.session_state.qa_chain.run(user_question)
+                st.write("Answer:", answer)
+
+                # Display supporting visualization based on question context
+                if any(word in user_question.lower() for word in ['temperature', 'hot', 'cold']):
+                    if frequency == 'daily':
+                        fig = px.line(weather_data, y=['temperature_2m_max', 'temperature_2m_min'], 
+                                    title='Temperature Trends')
+                    else:
+                        fig = px.line(weather_data, y='temperature_2m', title='Temperature Trends')
+                    st.plotly_chart(fig)
+                elif any(word in user_question.lower() for word in ['rain', 'precipitation']):
+                    if frequency == 'daily':
+                        fig = px.bar(weather_data, y='precipitation_sum', title='Precipitation')
+                    else:
+                        fig = px.bar(weather_data, y='precipitation', title='Precipitation')
+                    st.plotly_chart(fig)
+
 
 if __name__ == '__main__':
     main()
