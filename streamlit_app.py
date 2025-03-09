@@ -294,8 +294,7 @@ if st.session_state.weather_data is not None:
                     st.error(f"Error creating wind plots: {str(e)}")
             
             # Other hourly visualizations
-            # ...existing code for hourly visualizations...
-        
+
         else:  # daily data
             # Daily temperature extremes
             st.subheader("Temperature Analysis")
@@ -474,7 +473,6 @@ if st.session_state.weather_data is not None:
                     st.exception(e)
             
             # Other daily visualizations
-            # ...existing code for daily visualizations...
     
     with tab2:
         st.header("Advanced Analysis")
@@ -668,12 +666,24 @@ if st.session_state.weather_data is not None:
         # Use pre-computed correlation matrix from session state
         corr_matrix = st.session_state.corr_matrix
         
-        # Allow user to filter by feature count but don't trigger rerun
-        num_features = st.slider(
-            "Number of features to display", 
-            5, min(15, len(corr_matrix)), 10, 
-            key='corr_matrix_features'
-        )
+        # Initialize the session state for correlation matrix features if not present
+        if 'corr_matrix_features' not in st.session_state:
+            st.session_state.corr_matrix_features = min(10, len(corr_matrix))
+        
+        # Use a container to isolate the slider and prevent full page rerun
+        slider_container = st.container()
+        with slider_container:
+            num_features = st.slider(
+                "Number of features to display", 
+                min_value=5, 
+                max_value=min(15, len(corr_matrix)),
+                value=st.session_state.corr_matrix_features,
+                key="slider_features"
+            )
+            
+        # Only update the session state if the value has changed
+        if num_features != st.session_state.corr_matrix_features:
+            st.session_state.corr_matrix_features = num_features
         
         # Filter correlation matrix by variance
         if len(corr_matrix.columns) > num_features:
@@ -846,9 +856,12 @@ if st.session_state.weather_data is not None:
                 max_date_str = str(max_date)
             st.metric("End Date", max_date_str)
         
-        # Summary statistics
+        # Summary statistics - Fix timestamp serialization issue
         st.subheader("Summary Statistics")
-        summary_stats = weather_data.describe().T
+        
+        # Exclude datetime columns from summary statistics
+        numeric_cols = weather_data.select_dtypes(include=[np.number]).columns
+        summary_stats = weather_data[numeric_cols].describe().T
         summary_stats = summary_stats.round(2)  # Round for better display
         
         # Add variable descriptions
@@ -871,13 +884,14 @@ if st.session_state.weather_data is not None:
         st.write("Key Variables:")
         available_keys = [k for k in key_vars.keys() if k in summary_stats.index]
         if available_keys:
-            selected_stats = summary_stats.loc[available_keys]
-            selected_stats.insert(0, 'Description', [key_vars[idx] for idx in available_keys])
+            selected_stats = summary_stats.loc[available_keys].copy()  # Make a copy to avoid modifying original
+            # Convert any remaining problematic values to strings
+            selected_stats['Description'] = [key_vars[idx] for idx in available_keys]
             st.dataframe(selected_stats, use_container_width=True)
         else:
             st.write("No key variables available in this dataset.")
         
-        # Show the full statistics with an expander
+        # Show the full statistics with an expander - ensure it's serializable
         with st.expander("See full statistics for all variables"):
             st.dataframe(summary_stats, use_container_width=True)
         
@@ -886,7 +900,23 @@ if st.session_state.weather_data is not None:
         st.dataframe(weather_data.head(10), use_container_width=True)
         
         # Option to download data
-        csv = weather_data.to_csv()
+        # Create a copy of the data with properly formatted index
+        download_df = weather_data.copy()
+        
+        # Convert the index to a regular column
+        download_df = download_df.reset_index()
+        
+        # Format any datetime columns in the DataFrame
+        for column in download_df.columns:
+            if pd.api.types.is_datetime64_any_dtype(download_df[column]):
+                download_df[column] = download_df[column].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        if 'index' in download_df.columns:
+            download_df = download_df.rename(columns={'index': 'timestamp'})
+        
+        # Generate CSV with the formatted timestamps
+        csv = download_df.to_csv(index=False)
+        
         st.download_button(
             label="Download data as CSV",
             data=csv,
