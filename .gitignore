@@ -4,3 +4,7 @@
 .streamlit
 # toml files
 *.toml
+# Ignore Python pycache
+__pycache__/
+# Ignore Python env
+venv/
